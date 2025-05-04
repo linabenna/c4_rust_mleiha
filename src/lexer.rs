@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-enum Token {
+pub enum Token {
     Num(i64),
     Id(String),
     Char(char),
@@ -18,7 +18,7 @@ enum Token {
 // since pointers are considered unsafe in rust, other data structures like 
 // string slices (&str), indexes and options can track the source code.
 
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     source: &'a str, // the full input source code to tokenize
     position: usize, // current index in the source string
     line: usize, // current line number- for debugging like c4
@@ -32,7 +32,7 @@ struct Lexer<'a> {
 // new(): constructor to initialize the lexer - setting position, line, first char, populate keywords
 
 impl<'a> Lexer<'a> {
-    fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
+    pub fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
 
         // default constructor --= default values
         let mut lexer = Lexer {
@@ -80,7 +80,7 @@ impl<'a> Lexer<'a> {
     }
 
     // this function gets the next token from the source code
-    fn next_token(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<Token> {
         while let Some(c) = self.current_char { // loop while there is a current character to process
             match c {
                 ' ' | '\t' | '\r' => self.advance(), // skip whitespace characters
