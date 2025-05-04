@@ -67,6 +67,34 @@ impl<'a> Lexer<'a> {
         };
         self.position += 1; // move the reading position to the next 
     }
+
+    // this function gets the next token from the source code
+    fn next_token(&mut self) -> Option<Token> {
+        while let Some(c) = self.current_char { // loop while there is a current character to process
+            match c {
+                ' ' | '\t' | '\r' => self.advance(), // skip whitespace characters
+                '\n' => { // a newline is found?
+                    self.line += 1; // then increment line number 
+                    self.advance();
+                }
+                '0'..='9' => return Some(self.lex_number()), // if a digit is found, parse a number token
+
+                // if a letter or underscore is found, parse an identifier or keyword
+                'a'..='z' | 'A'..='Z' | '_' => return Some(self.lex_identifier()), 
+
+                // return simple character tokens like parentheses and semicolons directly
+                '(' | ')' | '{' | '}' | ';' => {
+                    let token = Token::Char(c);
+                    self.advance();
+                    return Some(token);
+                }
+                _ => { // if an unknown character is found, just skip it
+                    self.advance(); // skip
+                }
+            }
+        }
+        None 
+    }
 }
 
 // next_token(): the main function that advances through the source and yields tokens
