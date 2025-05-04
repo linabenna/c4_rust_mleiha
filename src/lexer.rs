@@ -28,6 +28,37 @@ struct Lexer<'a> {
 // following constructors and methods to build this lexer
 
 // new(): constructor to initialize the lexer - setting position, line, first char, populate keywords
+
+impl<'a> Lexer<'a> {
+    fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
+
+        // default constructor --= default values
+        let mut lexer = Lexer {
+            source, // full source code
+            position: 0, // start reading from pos 0 = the beginning
+            line: 1, // error tracking from line 1 = the first line
+            current_char: None,
+            keywords: HashMap::new(), // empty keyword map for now
+        };
+
+        // we need to populate the keyword map with reserved words
+        Token::Else;
+        lexer.keywords.insert("enum", Token::Enum);
+        lexer.keywords.insert("if", Token::If);
+        lexer.keywords.insert("int", Token::Int);
+        lexer.keywords.insert("return", Token::Return);
+        lexer.keywords.insert("sizeof", Token::Sizeof);
+        lexer.keywords.insert("while", Token::While);
+
+        // advance to the first character of the source code
+        // this mimics how c4 manually reads the first char into a variable
+        lexer.advance(); // we must define this now
+        lexer
+    }
+
+
+}
+
 // next_token(): the main function that advances through the source and yields tokens
 // other helper methods like advance(), peek(), skip_whitespace(), read_number(), read_id()
 
