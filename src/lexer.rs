@@ -95,10 +95,48 @@ impl<'a> Lexer<'a> {
         }
         None 
     }
+
+    // parses a sequence of digits into a number token
+    fn lex_number(&mut self) -> Token {
+        let mut value = 0;
+        while let Some(c) = self.current_char {
+            // if the character is a digit, convert it to a number and build the full value
+            if c.is_digit(10) {
+                value = value * 10 + c.to_digit(10).unwrap() as i64;
+                self.advance();
+            } else {
+                break; // stop reading if it's not a digit
+            }
+        }
+        Token::Num(value) // return the number as a token
+    }
+
+    // this method parses an identifier or a reserved keyword from c
+    fn lex_identifier(&mut self) -> Token {
+        let start = self.position - 1; // this si the satrting pos of the identifier
+
+        while let Some(c) = self.current_char { // keep reading letters, digits, or underscores
+            if c.is_alphanumeric() || c == '_' {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let identifier = &self.source[start..self.position - 1]; // get identifier from source code
+
+        if let Some(keyword) = self.keywords.get(identifier) { // check if the keyword is known 
+            keyword.clone() // if known, return the keyword token
+        } else {
+            // otherwise, return it as a regular identifier
+            Token::Id(identifier.to_string())
+        }
+    }
+    
 }
 
-// next_token(): the main function that advances through the source and yields tokens
-// other helper methods like advance(), peek(), skip_whitespace(), read_number(), read_id()
+
+
 
 // fn main() {
 //     // let source_code = "int main() {  printf('hello, world\n'); }";
