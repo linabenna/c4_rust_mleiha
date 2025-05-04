@@ -199,6 +199,8 @@ impl<'a> Lexer<'a> {
                 // if a letter or underscore is found, parse an identifier or keyword
                 'a'..='z' | 'A'..='Z' | '_' => return Some(self.lex_identifier()), 
 
+                '"' => return Some(self.lex_string()), // detect string literals
+
                 // return simple character tokens like parentheses and semicolons directly
                 '(' | ')' | '{' | '}' | ';' => {
                     let token = Token::Char(c);
@@ -249,11 +251,29 @@ impl<'a> Lexer<'a> {
             Token::Id(identifier.to_string())
         }
     }
+
+    // handlling when printf is printing full string
+    fn lex_string(&mut self) -> Token {
+        let start = self.position; // mark the start of the string
+        self.advance(); // skip the opening quote
+        // Read characters until we find the closing quote or end of input
+        while let Some(c) = self.current_char {
+            if c == '"' {
+                break; // found the closing quote
+            }
+            self.advance();
+        }
+        let string = &self.source[start..self.position - 1]; // extract the string content
+        self.advance(); // skip the closing quote
+        Token::Str(string.to_string()) // return the string token
+    }
     
 }
 
+
 fn main() {
-    let source_code = "int main() {  5 + 2; }";
+    // let source_code = "int main() {  5 + 2; }";
+    let source_code = r#"int main() {  printf("hello, world\n") ; }"#;
     // let source_code = "int main() {  return 0; }";
     let mut lexer = Lexer::new(source_code);
 
