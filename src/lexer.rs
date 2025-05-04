@@ -10,9 +10,10 @@ enum Token {
     Brak, LParen, RParen, LBrace, RBrace, Comma, Colon, Semicolon, RBrak,
 }
 
+// FROM C NEXT() TO RUST LEXER CLASS LOGIC EXPLAINED 
 // in the original c4 compiler the next function used a manual character 
 // pointer to iterate over the source code and classify tokens...
-// 
+
 // since pointers are considered unsafe in rust, other data structures like 
 // string slices (&str), indexes and options can track the source code.
 
@@ -52,11 +53,20 @@ impl<'a> Lexer<'a> {
 
         // advance to the first character of the source code
         // this mimics how c4 manually reads the first char into a variable
-        lexer.advance(); // we must define this now
+        lexer.advance();
         lexer
     }
 
-
+    // here this function moves to the next character in the source code
+    fn advance(&mut self) {
+        // if we're not at the end of the code, get the next byte and convert it to a char
+        self.current_char = if self.position < self.source.len() {
+            Some(self.source.as_bytes()[self.position] as char)
+        } else { // we reached the end of the source code
+            None
+        };
+        self.position += 1; // move the reading position to the next 
+    }
 }
 
 // next_token(): the main function that advances through the source and yields tokens
