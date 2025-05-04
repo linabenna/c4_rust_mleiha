@@ -74,8 +74,3 @@ const HClass: usize = 6;
 const HType: usize = 7;
 const HVal: usize = 8;
 const Idsz: usize = 9;
-
-fn main() {
-    // pass 
-}
-
