@@ -136,14 +136,12 @@ impl<'a> Lexer<'a> {
 }
 
 
+fn main() {
+    // let source_code = "int main() {  printf('hello, world\n'); }";
+    let source_code = "int main() {  return 0; }";
+    let mut lexer = Lexer::new(source_code);
 
-
-// fn main() {
-//     // let source_code = "int main() {  printf('hello, world\n'); }";
-//     let source_code = "int main() {  return 0; }";
-//     let mut lexer = Lexer::new(source_code);
-
-//     while let Some(token) = lexer.next_token() {
-//         println!("{:?}", token);
-//     }
-// }
+    while let Some(token) = lexer.next_token() {
+        println!("{:?}", token);
+    }
+}
