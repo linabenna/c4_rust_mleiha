@@ -1,80 +1,15 @@
 use std::collections::HashMap;
 
-// we start by re-writing all variables declared in c4
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
     Num(i64),
     Id(String),
     Char(char),
+    Str(String),
     Else, Enum, If, Int, Return, Sizeof, While, Assign, Cond, Lor, Lan, Or,
-    Xor, And, Eq, Ne, Lt, Gt, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec,
+    Xor, And, Eq, Ne, Lt, Le, Gt, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec,
     Brak, LParen, RParen, LBrace, RBrace, Comma, Colon, Semicolon, RBrak,
 }
-
-
-// these are opcode constants the vm can execute
-const LEA: i64 = 0; // load effective address
-const IMM: i64 = 1; // load immediate value
-const JMP: i64 = 2; // unconditional jump
-const JSR: i64 = 3; // jump to subroutine (function call)
-const BZ: i64 = 4; // branch if zero
-const BNZ: i64 = 5; // branch if not zero
-const ENT: i64 = 6; // enter function (setup stack frame)
-const ADJ: i64 = 7; // adjust stack
-const LEV: i64 = 8; // leave function
-const LI: i64 = 9; // load integer from memory
-const LC: i64 = 10; // load character from memory
-const SI: i64 = 11; // store integer to memory
-const SC: i64 = 12; // store character to memory
-const PSH: i64 = 13; // push value onto stack
-
-// the rest below are arithmetic and logical operations
-const OR: i64 = 14;
-const XOR: i64 = 15;
-const AND: i64 = 16;
-const EQ: i64 = 17;
-const NE: i64 = 18;
-const LT: i64 = 19;
-const GT: i64 = 20;
-const LE: i64 = 21;
-const GE: i64 = 22;
-const SHL: i64 = 23;
-const SHR: i64 = 24;
-const ADD: i64 = 25;
-const SUB: i64 = 26;
-const MUL: i64 = 27;
-const DIV: i64 = 28;
-const MOD: i64 = 29;
-
-// below are system calls
-const OPEN: i64 = 30;
-const READ: i64 = 31;
-const CLOS: i64 = 32;
-const PRTF: i64 = 33;
-const MALC: i64 = 34;
-const FREE: i64 = 35;
-const MSET: i64 = 36;
-const MCMP: i64 = 37;
-const EXIT: i64 = 38;
-
-// data types
-const CHAR: i64 = 0;
-const INT: i64 = 1;
-const PTR: i64 = 2;
-
-// since identifiers are stored in flat arrays (not structs), we use fixed offsets
-// each identifier entry will have multiple fields like token type, type, value, etc.
-const Tk: usize = 0;
-const Hash: usize = 1;
-const Name: usize = 2;
-const Class: usize = 3;
-const Type: usize = 4;
-const Val: usize = 5;
-const HClass: usize = 6;
-const HType: usize = 7;
-const HVal: usize = 8;
-const Idsz: usize = 9;
-
 
 // FROM C NEXT() TO RUST LEXER CLASS LOGIC EXPLAINED 
 // in the original c4 compiler the next function used a manual character 
@@ -134,6 +69,16 @@ impl<'a> Lexer<'a> {
         self.position += 1; // move the reading position to the next 
     }
 
+    // this function allows us to look at the next character in the source code 
+    // without actually advancing the current reading position (used for lookahead logic)
+    fn peek(&self) -> Option<char> { // sampe implementation as advance() method 
+        if self.position < self.source.len() {
+            Some(self.source.as_bytes()[self.position] as char)
+        } else {
+            None
+        }
+    }
+
     // this function gets the next token from the source code
     fn next_token(&mut self) -> Option<Token> {
         while let Some(c) = self.current_char { // loop while there is a current character to process
@@ -143,10 +88,118 @@ impl<'a> Lexer<'a> {
                     self.line += 1; // then increment line number 
                     self.advance();
                 }
+
+                // handle single-line comments and hash comments
+                '/' => {
+                    if self.peek() == Some('/') {
+                        while self.current_char != Some('\n') && self.current_char.is_some() {
+                            self.advance();
+                        }
+                    } else {
+                        self.advance();
+                        return Some(Token::Div);
+                    }
+                }
+                '#' => {
+                    while self.current_char != Some('\n') && self.current_char.is_some() {
+                        self.advance();
+                    }
+                }
+
+                // handle string literal
+                '"' => {
+                    self.advance();
+                    let mut string = String::new();
+                    while let Some(ch) = self.current_char {
+                        if ch == '"' {
+                            break;
+                        }
+                        string.push(ch);
+                        self.advance();
+                    }
+                    self.advance(); // skip closing "
+                    return Some(Token::Str(string));
+                }
+
+                // handle character literal
+                '\'' => {
+                    self.advance();
+                    let ch = self.current_char?;
+                    self.advance();
+                    self.advance(); // skip closing '
+                    return Some(Token::Char(ch));
+                }
+
+                // handle operators
+                '=' => {
+                    self.advance();
+                    if self.current_char == Some('=') {
+                        self.advance();
+                        return Some(Token::Eq);
+                    }
+                    return Some(Token::Assign);
+                }
+
+                '!' => {
+                    self.advance();
+                    if self.current_char == Some('=') {
+                        self.advance();
+                        return Some(Token::Ne);
+                    }
+                }
+
+                '<' => {
+                    self.advance();
+                    if self.current_char == Some('=') {
+                        self.advance();
+                        return Some(Token::Le);
+                    }
+                    return Some(Token::Lt);
+                }
+
+                '>' => {
+                    self.advance();
+                    if self.current_char == Some('=') {
+                        self.advance();
+                        return Some(Token::Ge);
+                    }
+                    return Some(Token::Gt);
+                }
+
+                '+' => {
+                    self.advance();
+                    if self.current_char == Some('+') {
+                        self.advance();
+                        return Some(Token::Inc);
+                    }
+                    return Some(Token::Add);
+                }
+
+                '-' => {
+                    self.advance();
+                    if self.current_char == Some('-') {
+                        self.advance();
+                        return Some(Token::Dec);
+                    }
+                    return Some(Token::Sub);
+                }
+
+                '*' => {
+                    self.advance();
+                    return Some(Token::Mul);
+                }
+
+                '%' => {
+                    self.advance();
+                    return Some(Token::Mod);
+                }
+
                 '0'..='9' => return Some(self.lex_number()), // if a digit is found, parse a number token
 
                 // if a letter or underscore is found, parse an identifier or keyword
                 'a'..='z' | 'A'..='Z' | '_' => return Some(self.lex_identifier()), 
+
+                '"' => return Some(self.lex_string()), // detect string literals
 
                 // return simple character tokens like parentheses and semicolons directly
                 '(' | ')' | '{' | '}' | ';' => {
@@ -198,11 +251,28 @@ impl<'a> Lexer<'a> {
             Token::Id(identifier.to_string())
         }
     }
+
+    // handlling when printf is printing full string
+    fn lex_string(&mut self) -> Token {
+        let start = self.position; // mark the start of the string
+        self.advance(); // skip the opening quote
+        // Read characters until we find the closing quote or end of input
+        while let Some(c) = self.current_char {
+            if c == '"' {
+                break; // found the closing quote
+            }
+            self.advance();
+        }
+        let string = &self.source[start..self.position - 1]; // extract the string content
+        self.advance(); // skip the closing quote
+        Token::Str(string.to_string()) // return the string token
+    }
     
 }
 
 fn main() {
-    let source_code = "int main() {  printf('hello, world\n'); }";
+    // let source_code = "int main() {  5 + 2; }";
+    let source_code = r#"int main() {  printf("hello, world\n") ; }"#;
     // let source_code = "int main() {  return 0; }";
     let mut lexer = Lexer::new(source_code);
 
