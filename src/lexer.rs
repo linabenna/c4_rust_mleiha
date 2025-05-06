@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Token {
+enum Token {
     Num(i64),
     Id(String),
     Char(char),
@@ -18,7 +18,7 @@ pub enum Token {
 // since pointers are considered unsafe in rust, other data structures like 
 // string slices (&str), indexes and options can track the source code.
 
-pub struct Lexer<'a> {
+struct Lexer<'a> {
     source: &'a str, // the full input source code to tokenize
     position: usize, // current index in the source string
     line: usize, // current line number- for debugging like c4
@@ -32,7 +32,7 @@ pub struct Lexer<'a> {
 // new(): constructor to initialize the lexer - setting position, line, first char, populate keywords
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
+    fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
 
         // default constructor --= default values
         let mut lexer = Lexer {
@@ -80,7 +80,7 @@ impl<'a> Lexer<'a> {
     }
 
     // this function gets the next token from the source code
-    pub fn next_token(&mut self) -> Option<Token> {
+    fn next_token(&mut self) -> Option<Token> {
         while let Some(c) = self.current_char { // loop while there is a current character to process
             match c {
                 ' ' | '\t' | '\r' => self.advance(), // skip whitespace characters
@@ -105,7 +105,6 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                 }
-
                 // handle string literal
                 '"' => {
                     self.advance();
@@ -117,10 +116,9 @@ impl<'a> Lexer<'a> {
                         string.push(ch);
                         self.advance();
                     }
-                    self.advance(); // skip closing "
+                    self.advance(); // skip the closing "
                     return Some(Token::Str(string));
                 }
-
                 // handle character literal
                 '\'' => {
                     self.advance();
@@ -129,17 +127,15 @@ impl<'a> Lexer<'a> {
                     self.advance(); // skip closing '
                     return Some(Token::Char(ch));
                 }
-
                 // handle operators
                 '=' => {
                     self.advance();
-                    if self.current_char == Some('=') {
+                    if self.current_char == Some('=') { // if it's == then the token is Eq
                         self.advance();
                         return Some(Token::Eq);
                     }
-                    return Some(Token::Assign);
+                    return Some(Token::Assign); // else its an assignment 
                 }
-
                 '!' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -147,7 +143,6 @@ impl<'a> Lexer<'a> {
                         return Some(Token::Ne);
                     }
                 }
-
                 '<' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -156,7 +151,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Lt);
                 }
-
                 '>' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -165,7 +159,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Gt);
                 }
-
                 '+' => {
                     self.advance();
                     if self.current_char == Some('+') {
@@ -174,7 +167,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Add);
                 }
-
                 '-' => {
                     self.advance();
                     if self.current_char == Some('-') {
@@ -183,15 +175,41 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Sub);
                 }
-
                 '*' => {
                     self.advance();
                     return Some(Token::Mul);
                 }
-
                 '%' => {
                     self.advance();
                     return Some(Token::Mod);
+                }
+                '(' => {
+                    self.advance();
+                    return Some(Token::LParen);
+                }
+                ')' => {
+                    self.advance();
+                    return Some(Token::RParen);
+                }
+                '{' => {
+                    self.advance();
+                    return Some(Token::LBrace);
+                }
+                '}' => {
+                    self.advance();
+                    return Some(Token::RBrace);
+                }
+                ';' => {
+                    self.advance();
+                    return Some(Token::Semicolon);
+                }
+                ':' => {
+                    self.advance();
+                    return Some(Token::Colon);
+                }
+                ',' => {
+                    self.advance();
+                    return Some(Token::Comma);
                 }
 
                 '0'..='9' => return Some(self.lex_number()), // if a digit is found, parse a number token
@@ -201,12 +219,6 @@ impl<'a> Lexer<'a> {
 
                 '"' => return Some(self.lex_string()), // detect string literals
 
-                // return simple character tokens like parentheses and semicolons directly
-                '(' | ')' | '{' | '}' | ';' => {
-                    let token = Token::Char(c);
-                    self.advance();
-                    return Some(token);
-                }
                 _ => { // if an unknown character is found, just skip it
                     self.advance(); // skip
                 }
@@ -270,10 +282,9 @@ impl<'a> Lexer<'a> {
     
 }
 
-
 fn main() {
     // let source_code = "int main() {  5 + 2; }";
-    let source_code = r#"int main() {  printf("hello, world\n") ; }"#;
+    let source_code = r#"int main() { printf("hello, world\n") ; }"#;
     // let source_code = "int main() {  return 0; }";
     let mut lexer = Lexer::new(source_code);
 
