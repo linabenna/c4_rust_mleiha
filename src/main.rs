@@ -105,7 +105,6 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                 }
-
                 // handle string literal
                 '"' => {
                     self.advance();
@@ -120,7 +119,6 @@ impl<'a> Lexer<'a> {
                     self.advance(); // skip the closing "
                     return Some(Token::Str(string));
                 }
-
                 // handle character literal
                 '\'' => {
                     self.advance();
@@ -129,7 +127,6 @@ impl<'a> Lexer<'a> {
                     self.advance(); // skip closing '
                     return Some(Token::Char(ch));
                 }
-
                 // handle operators
                 '=' => {
                     self.advance();
@@ -139,7 +136,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Assign);
                 }
-
                 '!' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -147,7 +143,6 @@ impl<'a> Lexer<'a> {
                         return Some(Token::Ne);
                     }
                 }
-
                 '<' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -156,7 +151,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Lt);
                 }
-
                 '>' => {
                     self.advance();
                     if self.current_char == Some('=') {
@@ -165,7 +159,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Gt);
                 }
-
                 '+' => {
                     self.advance();
                     if self.current_char == Some('+') {
@@ -174,7 +167,6 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Add);
                 }
-
                 '-' => {
                     self.advance();
                     if self.current_char == Some('-') {
@@ -183,17 +175,43 @@ impl<'a> Lexer<'a> {
                     }
                     return Some(Token::Sub);
                 }
-
                 '*' => {
                     self.advance();
                     return Some(Token::Mul);
                 }
-
                 '%' => {
                     self.advance();
                     return Some(Token::Mod);
                 }
-
+                '(' => {
+                    self.advance();
+                    return Some(Token::LParen);
+                }
+                ')' => {
+                    self.advance();
+                    return Some(Token::RParen);
+                }
+                '{' => {
+                    self.advance();
+                    return Some(Token::LBrace);
+                }
+                '}' => {
+                    self.advance();
+                    return Some(Token::RBrace);
+                }
+                ';' => {
+                    self.advance();
+                    return Some(Token::Semicolon);
+                }
+                ':' => {
+                    self.advance();
+                    return Some(Token::Colon);
+                }
+                ',' => {
+                    self.advance();
+                    return Some(Token::Comma);
+                }
+                
                 '0'..='9' => return Some(self.lex_number()), // if a digit is found, parse a number token
 
                 // if a letter or underscore is found, parse an identifier or keyword
@@ -201,12 +219,6 @@ impl<'a> Lexer<'a> {
 
                 '"' => return Some(self.lex_string()), // detect string literals
 
-                // return simple character tokens like parentheses and semicolons directly
-                '(' | ')' | '{' | '}' | ';' => {
-                    let token = Token::Char(c);
-                    self.advance();
-                    return Some(token);
-                }
                 _ => { // if an unknown character is found, just skip it
                     self.advance(); // skip
                 }
@@ -272,7 +284,7 @@ impl<'a> Lexer<'a> {
 
 fn main() {
     // let source_code = "int main() {  5 + 2; }";
-    let source_code = r#"int main() {  printf("hello, world\n") ; }"#;
+    let source_code = r#"int main() { printf("hello, world\n") ; }"#;
     // let source_code = "int main() {  return 0; }";
     let mut lexer = Lexer::new(source_code);
 
