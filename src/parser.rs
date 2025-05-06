@@ -1,5 +1,4 @@
 // Constants for tokens and opcodes- add more
-use Token::*;
 
 // #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 // #[repr(i32)]
@@ -212,6 +211,36 @@ impl Parser {
                 self.next();
             }
 
+            Token::Mul => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                if (self.ty == INT){
+                    self.ty = self.ty - PTR;
+                } else {
+                    eprintln!("{}: close paren expected in sizeof", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(if self.ty == CHAR { LC } else { LI })
+            }
+
+            Token::And => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                
+                if let Some(&last) = self.e.last() {
+                    if last == LC || last == LI {
+                        self.e.pop();
+                    } else {
+                        eprintln!("{}: bad address-of", self.line);
+                        std::process::exit(-1);
+                    }
+                } else {
+                    eprintln!("{}: close paren expected in sizeof", self.line);
+                    std::process::exit(-1);
+                }
+                self.ty = self.ty + PTR;
+            }
+
             Token::Not => {
                 self.next();
                 self.expr(Token::Inc.precedence().unwrap()); // Inc is the precedence level
@@ -236,6 +265,23 @@ impl Parser {
                 self.ty = INT;
             }
             
+            Token::Sub => {
+                self.next();
+                self.e.push(IMM);
+                match self.tk.clone() {
+                    Token::Num(val) => {
+                        self.e.push(-val);
+                        self.next();
+                    }
+                    _ => {
+                        self.e.push(-1);
+                        self.e.push(PSH);
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.e.push(MUL);
+                    }
+                }
+                self.ty = INT;
+            }
 
 
             _ => {
@@ -271,19 +317,7 @@ impl Parser {
 
 fn main() {
     let mut state = Parser::new();
-
-    // // Simulate sizeof(int)
-    // state.tokens = vec![
-    //     Token::Sizeof,
-    //     Token::LParen,
-    //     Token::Int,
-    //     Token::RParen,
-    // ];
-    // state.pos = 0;
-    // state.next(); // Initialize first token
-    // state.expr(0);
-    // println!("Emitted code (sizeof int): {:?}", state.e);
-
+    
     // Test with a number
     state.tk = Token::Num(42);
     state.expr(0);
