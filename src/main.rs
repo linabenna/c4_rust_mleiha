@@ -324,11 +324,11 @@ impl<'a> Lexer<'a> {
 
     // parses a sequence of digits into a number token
     fn lex_number(&mut self) -> Token {
-        let mut value = 0;
+        let mut value: i32 = 0;
         while let Some(c) = self.current_char {
             // if the character is a digit, convert it to a number and build the full value
             if c.is_digit(10) {
-                value = value * 10 + c.to_digit(10).unwrap() as i64;
+                value = value * 10 + c.to_digit(10).unwrap() as i32;
                 self.advance();
             } else {
                 break; // stop reading if it's not a digit
@@ -374,6 +374,7 @@ impl<'a> Lexer<'a> {
         self.advance(); // skip the closing quote
         Token::Str(string.to_string()) // return the string token
     }
+}
     
 ///////////////////////// Parser Implementation Begins ////////////////////////
 #[derive(Debug)]
