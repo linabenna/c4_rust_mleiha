@@ -30,11 +30,11 @@ enum Token {
     Id(String),
     Char(char),
     Str(String),
-    Else, Enum, If, Int, Return, Sizeof, While,
+    Else, Enum, If, Int, Return, Sizeof, While, Do,
     Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Lt, Shl, Add, Mul, Inc,
     Ne, Le, Gt, Ge, Shr, Sub, Div, Mod, Dec,
     Brak,
-    LParen, RParen, Comma, Colon, Semicolon, Not, BitNot,
+    LParen, RParen, RBrace, LBrace, Comma, Colon, Semicolon, Not, BitNot,
 }
 
 impl Token {
@@ -725,6 +725,130 @@ impl Parser {
         }
 
         address
+    }
+
+    fn stmt(&mut self) {
+        let mut a: usize;
+        let mut b: usize;
+  
+        match self.tk {
+            Token::If => {
+                self.next();
+                if let Token::LParen = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: open paren expected", self.line);
+                    std::process::exit(-1);
+                }
+                self.expr(Token::Assign.precedence().unwrap());
+                if let Token::RParen = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: close paren expected", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(BZ);
+                b = self.e.len();
+                self.e.push(0);
+                self.stmt();
+                if let Token::Else = self.tk {
+                    self.e[b] = (self.e.len() + 1) as i32;
+                    self.e.push(JMP);
+                    b = self.e.len();
+                    self.next();
+                    self.stmt();
+                }
+                self.e[b] = (self.e.len() + 1) as i32;
+            }
+            Token::While => {
+                self.next();
+                a = self.e.len() + 1;
+                if let Token::LParen = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: open paren expected", self.line);
+                    std::process::exit(-1);
+                }
+                self.expr(Token::Assign.precedence().unwrap());
+                if let Token::RParen = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: close paren expected", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(BZ);
+                b = self.e.len();
+                self.e.push(0);
+                self.stmt();
+                self.e.push(JMP);
+                self.e.push(a as i32);
+                self.e[b] = (self.e.len() + 1) as i32;
+            }
+            Token::Do => {
+                self.next();
+                a = self.e.len() + 1; // Beginning of do-while body
+                self.stmt();
+                if let Token::While = self.tk {
+                    self.next();
+                    if let Token::LParen = self.tk {
+                        self.next();
+                    } else {
+                        eprintln!("{}: open paren expected after while in do-while", self.line);
+                        std::process::exit(-1);
+                    }
+                    self.expr(Token::Assign.precedence().unwrap());
+                    if let Token::RParen = self.tk {
+                        self.next();
+                    } else {
+                        eprintln!("{}: close paren expected after while in do-while", self.line);
+                        std::process::exit(-1);
+                    }
+                    self.e.push(BNZ);
+                    self.e.push(a as i32);
+                    if let Token::Semicolon = self.tk {
+                        self.next();
+                    } else {
+                        eprintln!("{}: semicolon expected after do-while", self.line);
+                        std::process::exit(-1);
+                    }
+                } else {
+                    eprintln!("{}: while expected after do statement", self.line);
+                    std::process::exit(-1);
+                }
+            }
+            Token::Return => {
+                self.next();
+                if self.tk != Token::Semicolon {
+                    self.expr(Token::Assign.precedence().unwrap());
+                }
+                self.e.push(LEV);
+                if let Token::Semicolon = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: semicolon expected", self.line);
+                    std::process::exit(-1);
+                }
+            }
+            Token::LBrace => {
+                self.next();
+                while self.tk != Token::RBrace {
+                    self.stmt();
+                }
+                self.next();
+            }
+            Token::Semicolon => {
+                self.next();
+            }
+            _ => {
+                self.expr(Token::Assign.precedence().unwrap());
+                if let Token::Semicolon = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: semicolon expected", self.line);
+                    std::process::exit(-1);
+                }
+            }
+        }
     }
 }
 
