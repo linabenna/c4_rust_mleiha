@@ -4,6 +4,8 @@ This project is a Rust-based reimplementation of the original C4 compiler, build
 
 By rewriting the compiler in Rust, we aimed to preserve the original behavior and output, while improving code clarity, maintainability, and structure where possible. This approach has also allowed us to explore the compiler's internal mechanisms in greater detail and apply language-level improvements aligned with Rust’s paradigms.
 
+
+
 The complete translation is provided in src/main.rs
 
 ## Deliverables:
