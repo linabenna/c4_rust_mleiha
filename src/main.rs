@@ -1,5 +1,9 @@
 // Constants for tokens and opcodes- add more
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{self, Read}; // Import Read trait
+use std::ptr;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
     None, 
@@ -1102,20 +1106,297 @@ impl Parser {
 }
 
 
-fn main() {
-    let mut state = Parser::new();
+// fn main() {
+//     let mut state = Parser::new();
     
-    // Test with a number
-    state.tk = Token::Num(42);
-    state.expr(0);
-    println!("Emitted code (number): {:?}", state.e);
+//     // Test with a number
+//     state.tk = Token::Num(42);
+//     state.expr(0);
+//     println!("Emitted code (number): {:?}", state.e);
 
-    // Reset state
-    state.e.clear();
+//     // Reset state
+//     state.e.clear();
 
-    // Test with a string
-    state.tk = Token::Str("hello".to_string());
-    state.expr(0);
-    println!("Emitted code (string): {:?}", state.e);
-    println!("Data section (string): {:?}", state.data);
+//     // Test with a string
+//     state.tk = Token::Str("hello".to_string());
+//     state.expr(0);
+//     println!("Emitted code (string): {:?}", state.e);
+//     println!("Data section (string): {:?}", state.data);
+// }
+
+const POOL_SIZE: usize = 256 * 1024; // Define POOL_SIZE
+
+fn main() {
+    let mut src = false;
+    let mut debug = false;
+    let args: Vec<String> = std::env::args().collect();
+    
+    let mut argc = args.len() - 1; // Exclude the program name
+    let mut argv = &args[1..];
+
+    if argc > 0 && argv[0] == "-s" {
+        src = true;
+        argc -= 1;
+        argv = &argv[1..];
+    }
+    if argc > 0 && argv[0] == "-d" {
+        debug = true;
+        argc -= 1;
+        argv = &argv[1..];
+    }
+    if argc < 1 {
+        eprintln!("usage: c4 [-s] [-d] file ...");
+        return;
+    }
+
+    let file_path = &argv[0];
+    let mut file = match File::open(file_path) {
+        Ok(f) => f,
+        Err(_) => {
+            eprintln!("could not open({})", file_path);
+            return;
+        }
+    };
+
+    // Allocate memory pools
+    let sym = vec![0; POOL_SIZE]; // Symbol area
+    let e = vec![0; POOL_SIZE]; // Text area
+    let data = vec![0; POOL_SIZE]; // Data area
+    let mut sp = vec![0; POOL_SIZE]; // Stack area
+
+    // Read the source file
+    let mut source = String::new();
+    file.read_to_string(&mut source).unwrap();
+
+    // Initialize the lexer
+    let mut lexer = Lexer::new(&source);
+    
+    // Parse declarations
+    let mut line = 1;
+    let mut tk = lexer.next_token(); // Get the first token
+    let mut ival = 0; // Define ival to hold enum initializer values
+    //let mut idmain = None;
+    let mut idmain: Option<Parser> = None; // Define idmain to hold the main function reference
+
+
+    while tk != Some(Token::None) {
+        let mut bt = INT; // Base type
+        match tk {
+            Some(Token::Int) => {
+                tk = lexer.next_token();
+            }
+            Some(Token::Char(_)) => {
+                tk = lexer.next_token();
+                bt = CHAR;
+            }
+            Some(Token::Enum) => {
+                tk = lexer.next_token();
+                if tk == Some(Token::LBrace) {
+                    tk = lexer.next_token();
+                    let mut i = 0;
+                    while tk != Some(Token::RBrace) {
+                        if let Some(Token::Id(_)) = tk {
+                            eprintln!("{}: bad enum identifier {:?}", line, tk);
+                            return;
+                        }
+                        tk = lexer.next_token();
+                        if tk == Some(Token::Assign) {
+                            tk = lexer.next_token();
+                            if let Some(Token::Num(_)) = tk {
+                                eprintln!("{}: bad enum initializer", line);
+                                return;
+                            }
+                            // Assuming you have a way to get the value of the number
+                            // For example, if you have a method to get the value of the number token
+                            ival = get_number_value(tk); // Define this function to extract the value
+                            tk = lexer.next_token();
+                        }
+                        // Add to symbol table
+                        // Assuming you have a way to add to the symbol table
+                        // id[Class] = Num; id[Type] = INT; id[Val] = i++;
+                        if tk == Some(Token::Comma) {
+                            tk = lexer.next_token();
+                        }
+                    }
+                    tk = lexer.next_token();
+                }
+            }
+            _ => {
+                eprintln!("{}: unexpected token {:?}", line, tk);
+                return;
+            }
+        }
+
+        // Handle global declarations
+        while tk != Some(Token::Semicolon) && tk != Some(Token::RBrace) {
+            let mut ty = bt;
+            while tk == Some(Token::Mul) {
+                tk = lexer.next_token();
+                ty += PTR; // Assuming PTR is defined
+            }
+            if let Some(Token::Id(_)) = tk {
+                eprintln!("{}: bad global declaration {:?}", line, tk);
+                return;
+            }
+            // Check for duplicate definitions
+            // Assuming you have a way to check for duplicates
+            tk = lexer.next_token();
+            // id[Type] = ty; // Assuming you have a way to set the type
+
+            if tk == Some(Token::LParen) { // Function
+                // Handle function declaration
+                // Similar to the C code, handle parameters and local declarations
+            } else {
+                // Handle global variable declaration
+                // id[Class] = Glo; id[Val] = (int)data; // Assuming you have a way to set these
+                // data += std::mem::size_of::<i32>(); // Assuming you have a way to manage data
+            }
+            if tk == Some(Token::Comma) {
+                tk = lexer.next_token();
+            }
+        }
+        tk = lexer.next_token();
+    }
+
+    // Assuming idmain is defined and points to the main function
+    if let Some(main_func) = idmain {
+        // let pc = main_func.ival as *mut i32; // Get the program counter from the main function
+        let mut pc = main_func.ival as *mut i32;  // Declare pc as mutable
+        if src {
+            return;
+        }
+
+        // Setup stack
+        let mut bp = unsafe{sp.as_mut_ptr().add(POOL_SIZE)};
+        let mut sp = bp;
+        let mut t = 0; // Define t as needed
+        unsafe {
+            *sp = EXIT; // Call exit if main returns
+            sp = sp.sub(1);
+            *sp = PSH; // Push the return address
+            sp = sp.sub(1);
+            *sp = argc as i32; // Push argc
+            sp = sp.sub(1);
+            *sp = argv.as_ptr() as i32; // Push argv
+            sp = sp.sub(1);
+            *sp = t as i32; // Push the temporary pointer
+        }
+
+        // Run the virtual machine
+        let mut cycle = 0;
+        loop {
+            let i = unsafe { *pc }; // Fetch the instruction
+            pc = unsafe{pc.add(1)}; // Move to the next instruction
+            cycle += 1;
+
+            if debug {
+                println!("{}> {:?}", cycle, i); // Print debug information
+            }
+
+            match i {
+                LEA => {
+                    let a = unsafe { *(bp.add((*pc).try_into().unwrap())) }; // Load local address
+                    pc = unsafe{pc.add(1)};
+                }
+                IMM => {
+                    let a = unsafe { *pc }; // Load immediate value
+                    pc = unsafe{pc.add(1)};
+                }
+                JMP => {
+                    pc = unsafe { *(pc as *mut *mut i32) }; // Jump
+                }
+                JSR => {
+                    unsafe {
+                        sp = sp.sub(1);
+                        *sp = (pc as i32) + 1; // Save return address
+                    }
+                    pc = unsafe { *(pc as *mut *mut i32) }; // Jump to subroutine
+                }
+                BZ => {
+                    let a = unsafe { *sp }; // Fetch value from stack
+                    if a == 0 {
+                        pc = unsafe { *(pc as *mut *mut i32) }; // Branch if zero
+                    } else {
+                        pc = unsafe{pc.add(1)};
+                    }
+                }
+                BNZ => {
+                    let a = unsafe { *sp }; // Fetch value from stack
+                    if a != 0 {
+                        pc = unsafe { *(pc as *mut *mut i32) }; // Branch if not zero
+                    } else {
+                        pc =unsafe{ pc.add(1)};
+                    }
+                }
+                ENT => {
+                    unsafe {
+                        sp = sp.sub(1);
+                        *sp = bp as i32; // Enter subroutine
+                        sp = sp.sub((*pc as usize));  // Adjust stack pointer
+                    }
+                    bp = sp;
+                    pc = unsafe{pc.add(1)};
+                }
+                ADJ => {
+                    // sp = unsafe {sp.add(*pc)}; // Stack adjust
+                    sp = unsafe {sp.add((*pc).try_into().unwrap())}; // Stack adjust
+                    pc = unsafe {pc.add(1)};
+                }
+                LEV => {
+                    sp = bp; // Leave subroutine
+                    bp = unsafe { *sp as *mut i32 };
+                    pc = unsafe { *sp.add(1) as *mut i32 };
+                }
+                LI => {
+                    let a = unsafe { *(sp as *mut i32) }; // Load integer from stack
+                }
+                LC => {
+                    let a = unsafe { *(sp as *mut u8) }; // Load character from stack
+                }
+                SI => {
+                    let a = unsafe { *sp }; // Fetch integer from stack
+                    unsafe {
+                        *(sp as *mut i32) = a; // Store integer
+                    }
+                    sp = unsafe{sp.add(1)};
+                }
+                SC => {
+                    let a = unsafe { *sp }; // Fetch character from stack
+                    unsafe {
+                        *(sp as *mut u8) = a as u8; // Store character
+                    }
+                    sp = unsafe{sp.add(1)};
+                }
+                PSH => {
+                    let a = unsafe { *sp }; // Fetch value to push onto stack
+                    unsafe {
+                        sp = sp.sub(1);
+                        *sp = a; // Push value
+                    }
+                }
+                EXIT => {
+                    unsafe {
+                        println!("exit({}) cycle = {}", *sp, cycle);
+                    }
+                    return; // Exit the program
+                }
+                _ => {
+                    eprintln!("unknown instruction = {}! cycle = {}", i, cycle);
+                    return; // Handle unknown instruction
+                }
+            }
+            
+            
+        }
+    } else {
+        eprintln!("Main function not defined.");
+    }
+}
+
+// Define a function to extract the value from a number token
+fn get_number_value(token: Option<Token>) -> i32 {
+    match token {
+        Some(Token::Num(value)) => value,
+        _ => 0, // Default value if not a number
+    }
 }
