@@ -321,6 +321,68 @@ impl Parser {
                 self.ty = self.ty + PTR;
             }
 
+            Token::LParen => {
+                self.next(); // consume '('
+                match self.tk {
+                    Token::Int => {
+                        // Handle cast for 'Int'
+                        let mut t = INT;  // Initialize the type as INT
+                        self.next(); // consume 'Int'
+            
+                        // Check for pointer dereferencing (*)
+                        while let Token::Mul = self.tk {
+                            self.next(); // consume '*'
+                            t = t + PTR; // Adjust type for pointers
+                        }
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: bad cast", self.line); // Handle bad cast
+                        }
+            
+                        // Handle the casted expression
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.ty = t; // Set the type for the expression
+                    }
+                    Token::Char(_) => {
+                        // Handle cast for 'Char'
+                        let mut t = CHAR;  // Initialize the type as CHAR
+                        self.next(); // consume 'Char'
+            
+                        // Check for pointer dereferencing (*)
+                        while let Token::Mul = self.tk {
+                            self.next(); // consume '*'
+                            t = t + PTR; // Adjust type for pointers
+                        }
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: bad cast", self.line); // Handle bad cast
+                        }
+            
+                        // Handle the casted expression
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.ty = t; // Set the type for the expression
+                    }
+                    _ => {
+                        // Regular parenthesis group
+                        self.expr(Token::Assign.precedence().unwrap());
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: close paren expected", self.line); // Handle missing closing parenthesis
+                        }
+                    }
+                }
+            }            
+
+            
             Token::Not => {
                 self.next();
                 self.expr(Token::Inc.precedence().unwrap()); // Inc is the precedence level
