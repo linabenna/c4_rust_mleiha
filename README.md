@@ -6,17 +6,38 @@ By rewriting the compiler in Rust, we aimed to preserve the original behavior an
 
 The complete translation is provided in src/main.rs
 
-## Features
+## Deliverables:
+- Translation in src/main.rs
+- Comparision Document in c4_rust_comparison.pdf
+- Bonus Code and Documentation in Bonus/bonus_documented.pdf
 
+## Features
 - Supports the same subset of C as the original C4 compiler  
 - Rust-based implementation focused on performance and safety  
 - Modular and cleanly structured codebase  
 - Similar behavior with the C version across supported test cases  
 
 ## Usage
-
 Clone the repository and navigate to the compiler source directory:
 
 ```bash
 git clone https://github.com/linabenna/c4_rust_mleiha.git
 cd c4_rust_mleiha/src
+```
+## Build & Run
+To build the project:
+```bash
+cargo build
+```
+To run the compiler on a C source file (e.g., hello_world.c):
+```bash
+cargo run -- hello_world.c
+```
+
+## View Documentation
+You can generate and view the Rust documentation for the codebase using:
+```bash
+cargo doc
+cargo doc --open
+```
+This will open the documentation in your default web browser, allowing you to explore modules, functions, and internal structure.
