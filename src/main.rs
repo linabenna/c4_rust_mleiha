@@ -1400,3 +1400,4 @@ fn get_number_value(token: Option<Token>) -> i32 {
         _ => 0, // Default value if not a number
     }
 }
+

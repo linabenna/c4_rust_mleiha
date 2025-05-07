@@ -1,4 +1,5 @@
 // Constants for tokens and opcodes- add more
+
 use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
