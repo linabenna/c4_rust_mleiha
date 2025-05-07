@@ -7,6 +7,6 @@ fn test_parser_main() {
     let mut lexer = Lexer::new(code);
     let mut parser = Parser::new(&mut lexer);
     
-    parser.parse_program(); // Adjust based on function name
+    parser.parse_program(); 
     println!("Parser ran successfully.");
 }
