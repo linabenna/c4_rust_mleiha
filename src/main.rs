@@ -1,7 +1,5 @@
 // Constants for tokens and opcodes- add more
 
-use std::collections::HashMap;
-
 // #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 // #[repr(i32)]
 // enum Token {
@@ -24,7 +22,7 @@ use std::collections::HashMap;
 //     Not = b'!' as i32,
 //     BitNot = b'~' as i32,
 // }
-
+use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
     None, 
@@ -32,12 +30,11 @@ enum Token {
     Id(String),
     Char(char),
     Str(String),
-    Else, Enum, If, Int, Return, Sizeof, While, 
+    Else, Enum, If, Int, Return, Sizeof, While,
     Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Lt, Shl, Add, Mul, Inc,
     Ne, Le, Gt, Ge, Shr, Sub, Div, Mod, Dec,
     Brak,
     LParen, RParen, Comma, Colon, Semicolon, Not, BitNot,
-
 }
 
 impl Token {
@@ -142,7 +139,6 @@ struct Parser {
     data: Vec<u8>, // <--- memory area to simulate global string storage
     pos: i32, 
     symbols: HashMap<String, Symbol>,
-
 }
 
 impl Parser {
@@ -156,9 +152,7 @@ impl Parser {
             line: 1,
             data: Vec::new(),
             pos: 0,
-
             symbols: HashMap::new(),
-
         }
     }
 
@@ -217,13 +211,11 @@ impl Parser {
                 while self.tk == Token::Mul {
                     self.next();
                     self.ty += PTR;
-
                 }
                 if self.tk != Token::RParen {
                     eprintln!("{}: close paren expected in sizeof", self.line);
                     std::process::exit(-1);
                 }
-
                 self.next();
             
                 self.e.push(IMM);
@@ -308,7 +300,6 @@ impl Parser {
                     eprintln!("{}: close paren expected in sizeof", self.line);
                     std::process::exit(-1);
                 }
-
                 self.e.push(if self.ty == CHAR { LC } else { LI })
             }
 
@@ -477,8 +468,244 @@ impl Parser {
         }
     
         // precedence climbing would go here
-    }
+        let mut t = self.ty; // Store the current type
+    let mut d: usize; // Placeholder for jump addresses
 
+    while let Some(precedence) = self.tk.precedence() {
+        if precedence < lev {
+            break; // Exit if the current token's precedence is less than the level
+        }
+
+        match self.tk {
+            Token::Assign => {
+                self.next();
+                if self.e.last() == Some(&LC) || self.e.last() == Some(&LI) {
+                    self.e.push(PSH);
+                } else {
+                    eprintln!("{}: bad lvalue in assignment", self.line);
+                    std::process::exit(-1);
+                }
+                self.expr(Token::Assign.precedence().unwrap());
+                self.e.push(if t == CHAR { SC } else { SI });
+            }
+            Token::Cond => {
+                self.next();
+                self.e.push(BZ);
+                d = self.e.len(); // Save the current position for the jump
+                self.expr(Token::Assign.precedence().unwrap());
+                if let Token::Colon = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: conditional missing colon", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(JMP);
+                let jump_pos = self.e.len();
+                self.e.push(0); // Placeholder for the jump
+                self.expr(Token::Cond.precedence().unwrap());
+                self.e[jump_pos - 1] = (self.e.len() + 1) as i32; // Fill in the jump address
+            }
+            Token::Lor => {
+                self.next();
+                self.e.push(BNZ);
+                d = self.e.len();
+                self.expr(Token::Lan.precedence().unwrap());
+                self.e.push((self.e.len() + 1) as i32); // Fill in the jump address
+                self.ty = INT;
+            }
+            Token::Lan => {
+                self.next();
+                self.e.push(BZ);
+                d = self.e.len();
+                self.expr(Token::Or.precedence().unwrap());
+                self.e.push((self.e.len() + 1) as i32); // Fill in the jump address
+                self.ty = INT;
+            }
+            Token::Or => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Xor.precedence().unwrap());
+                self.e.push(OR);
+                self.ty = INT;
+            }
+            Token::Xor => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::And.precedence().unwrap());
+                self.e.push(XOR);
+                self.ty = INT;
+            }
+            Token::And => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Eq.precedence().unwrap());
+                self.e.push(AND);
+                self.ty = INT;
+            }
+            Token::Eq => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Lt.precedence().unwrap());
+                self.e.push(EQ);
+                self.ty = INT;
+            }
+            Token::Ne => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Lt.precedence().unwrap());
+                self.e.push(NE);
+                self.ty = INT;
+            }
+            Token::Lt => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Shl.precedence().unwrap());
+                self.e.push(LT);
+                self.ty = INT;
+            }
+            Token::Gt => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Shl.precedence().unwrap());
+                self.e.push(GT);
+                self.ty = INT;
+            }
+            Token::Le => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Shl.precedence().unwrap());
+                self.e.push(LE);
+                self.ty = INT;
+            }
+            Token::Ge => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Shl.precedence().unwrap());
+                self.e.push(GE);
+                self.ty = INT;
+            }
+            Token::Shl => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Add.precedence().unwrap());
+                self.e.push(SHL);
+                self.ty = INT;
+            }
+            Token::Shr => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Add.precedence().unwrap());
+                self.e.push(SHR);
+                self.ty = INT;
+            }
+            Token::Add => {
+                self.next();
+                self.e .push(PSH);
+                self.expr(Token::Mul.precedence().unwrap());
+                if (t > PTR) {
+                    self.e.push(PSH);
+                    self.e.push(IMM);
+                    self.e.push(std::mem::size_of::<i32>() as i32);
+                    self.e.push(MUL);
+                }
+                self.e.push(ADD);
+            }
+            Token::Sub => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Mul.precedence().unwrap());
+                if t > PTR && t == self.ty {
+                    self.e.push(SUB);
+                    self.e.push(PSH);
+                    self.e.push(IMM);
+                    self.e.push(std::mem::size_of::<i32>() as i32);
+                    self.e.push(DIV);
+                    self.ty = INT;
+                } else if (self.ty > PTR) {
+                    self.e.push(PSH);
+                    self.e.push(IMM);
+                    self.e.push(std::mem::size_of::<i32>() as i32);
+                    self.e.push(MUL);
+                    self.e.push(SUB);
+                } else {
+                    self.e.push(SUB);
+                }
+            }
+            Token::Mul => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Inc.precedence().unwrap());
+                self.e.push(MUL);
+                self.ty = INT;
+            }
+            Token::Div => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Inc.precedence().unwrap());
+                self.e.push(DIV);
+                self.ty = INT;
+            }
+            Token::Mod => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Inc.precedence().unwrap());
+                self.e.push(MOD);
+                self.ty = INT;
+            }
+            Token::Inc | Token::Dec => {
+                if self.e.last() == Some(&LC) {
+                    self.e.push(PSH);
+                    self.e.push(LC);
+                } else if self.e.last() == Some(&LI) {
+                    self.e.push(PSH);
+                    self.e.push(LI);
+                } else {
+                    eprintln!("{}: bad lvalue in post-increment", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(PSH);
+                self.e.push(IMM);
+                self.e.push(if self.ty > PTR { std::mem::size_of::<i32>() as i32 } else { std::mem::size_of::<char>() as i32 });
+                self.e.push(if self.tk == Token::Inc { ADD } else { SUB });
+                self.e.push(if self.ty == CHAR { SC } else { SI });
+                self.e.push(PSH);
+                self.e.push(IMM);
+                self.e.push(if self.ty > PTR { std::mem::size_of::<i32>() as i32 } else { std::mem::size_of::<char>() as i32 });
+                self.e.push(if self.tk == Token::Inc { SUB } else { ADD });
+                self.next();
+            }
+            Token::Brak => {
+                self.next();
+                self.e.push(PSH);
+                self.expr(Token::Assign.precedence().unwrap());
+                if let Token::RParen = self.tk {
+                    self.next();
+                } else {
+                    eprintln!("{}: close bracket expected", self.line);
+                    std::process::exit(-1);
+                }
+                if t > PTR {
+                    self.e.push(PSH);
+                    self.e.push(IMM);
+                    self.e.push(std::mem::size_of::<i32>() as i32);
+                    self.e.push(MUL);
+                } else if t < PTR {
+                    eprintln!("{}: pointer type expected", self.line);
+                    std::process::exit(-1);
+                }
+                self.e.push(ADD);
+
+                self.ty = t - PTR; // Assign the new type
+                self.e.push(if self.ty == CHAR { LC } else { LI });
+            }
+            _ => {
+                eprintln!("{}: compiler error tk={:?}", self.line, self.tk);
+                std::process::exit(-1);
+            }
+        }
+    }
+    
+    }
 
     fn store_string(&mut self, s: &str) -> i32 {
         // Align to 4 bytes (simulate C4's `sizeof(int) & -sizeof(int)`)
