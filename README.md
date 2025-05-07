@@ -6,6 +6,11 @@ By rewriting the compiler in Rust, we aimed to preserve the original behavior an
 
 The complete translation is provided in src/main.rs
 
+## Deliverables:
+- Translation in src/main.rs
+- Comparision Document in c4_rust_comparison.pdf
+- Bonus Code and Documentation in Bonus/bonus_documented.pdf
+
 ## Features
 - Supports the same subset of C as the original C4 compiler  
 - Rust-based implementation focused on performance and safety  
@@ -36,8 +41,3 @@ cargo doc
 cargo doc --open
 ```
 This will open the documentation in your default web browser, allowing you to explore modules, functions, and internal structure.
-
-## Deliverables:
-- Translation in src/main.rs
-- Comparision Document in c4_rust_comparison.pdf
-- Bonus Code and Documentation in Bonus/bonus_documented.pdf
