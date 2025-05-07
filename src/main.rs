@@ -425,8 +425,42 @@ impl Parser {
                 self.ty = INT;
             }
 
-
-
+            Token::Inc | Token::Dec => {
+                let t = self.tk.clone(); // Clone the current token (Inc or Dec)
+                self.next(); // Consume the token (either Inc or Dec)
+                
+                // Evaluate the expression for the operand
+                self.expr(Token::Inc.precedence().unwrap());
+            
+                // Handle the left operand type (either LC or LI)
+                match self.e.last() {
+                    Some(&LC) => {
+                        self.e.push(PSH); // Push the operand to the stack
+                        self.e.push(LC); // Load the left value
+                    }
+                    Some(&LI) => {
+                        self.e.push(PSH); // Push the operand to the stack
+                        self.e.push(LI); // Load the left integer
+                    }
+                    _ => {
+                        panic!("{}: bad lvalue in pre-increment", self.line); // Handle bad lvalue
+                    }
+                }
+            
+                // Push the size of the type onto the stack
+                self.e.push(PSH); // Push
+                let size = if self.ty > PTR {
+                    IMM // Immediate value
+                } else {
+                    IMM // Immediate value for char
+                };
+                self.e.push(size);
+                self.e.push(if t == Token::Inc { ADD } else { SUB }); // ADD for Inc, SUB for Dec
+            
+                // Store the result (either as a character or an integer)
+                self.e.push(if self.ty == CHAR { SC } else { SI });
+            }
+            
             _ => {
                 eprintln!("{}: bad expression", self.line);
                 std::process::exit(-1);
