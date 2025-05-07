@@ -1,3 +1,5 @@
+// this is the full implementation of the c4 compiler, not just the vm-- 
+// the vm can be found int he main functtion below.
 // Constants for tokens and opcodes- add more
 use std::collections::HashMap;
 use std::fs::File;
