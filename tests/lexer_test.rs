@@ -1,4 +1,5 @@
 // tests/lexer_test.rs
+// pull request demo
 use c4_rust_mleiha::lexer::{Lexer, Token}; // Adjust crate name if different
 
 // Helper function to collect all tokens including EOF
