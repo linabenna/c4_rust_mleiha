@@ -18,5 +18,5 @@ The complete translation is provided in src/main.rs
 Clone the repository and navigate to the compiler source directory:
 
 ```bash
-git clone https://github.com/<your-username>/c4_rust_mleiha.git
+git clone https://github.com/linabenna/c4_rust_mleiha.git
 cd c4_rust_mleiha/src
