@@ -1,5 +1,7 @@
 // Constants for tokens and opcodes- add more
 
+use std::collections::HashMap;
+
 // #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 // #[repr(i32)]
 // enum Token {
@@ -22,7 +24,7 @@
 //     Not = b'!' as i32,
 //     BitNot = b'~' as i32,
 // }
-use std::collections::HashMap;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
     None, 
@@ -30,11 +32,12 @@ enum Token {
     Id(String),
     Char(char),
     Str(String),
-    Else, Enum, If, Int, Return, Sizeof, While,
+    Else, Enum, If, Int, Return, Sizeof, While, 
     Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Lt, Shl, Add, Mul, Inc,
     Ne, Le, Gt, Ge, Shr, Sub, Div, Mod, Dec,
     Brak,
     LParen, RParen, Comma, Colon, Semicolon, Not, BitNot,
+
 }
 
 impl Token {
@@ -139,6 +142,7 @@ struct Parser {
     data: Vec<u8>, // <--- memory area to simulate global string storage
     pos: i32, 
     symbols: HashMap<String, Symbol>,
+
 }
 
 impl Parser {
@@ -152,7 +156,9 @@ impl Parser {
             line: 1,
             data: Vec::new(),
             pos: 0,
+
             symbols: HashMap::new(),
+
         }
     }
 
@@ -211,11 +217,13 @@ impl Parser {
                 while self.tk == Token::Mul {
                     self.next();
                     self.ty += PTR;
+
                 }
                 if self.tk != Token::RParen {
                     eprintln!("{}: close paren expected in sizeof", self.line);
                     std::process::exit(-1);
                 }
+
                 self.next();
             
                 self.e.push(IMM);
@@ -300,6 +308,7 @@ impl Parser {
                     eprintln!("{}: close paren expected in sizeof", self.line);
                     std::process::exit(-1);
                 }
+
                 self.e.push(if self.ty == CHAR { LC } else { LI })
             }
 
@@ -469,6 +478,7 @@ impl Parser {
     
         // precedence climbing would go here
     }
+
 
     fn store_string(&mut self, s: &str) -> i32 {
         // Align to 4 bytes (simulate C4's `sizeof(int) & -sizeof(int)`)
