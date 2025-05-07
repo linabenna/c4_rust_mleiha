@@ -1,6 +1,6 @@
 // tests/lexer_test.rs
 
-use c4_rust_mleiha::lexer::Lexer; // Adjust crate name if different
+use c4_rust_mleiha::lexer::Lexer; 
 
 // Helper function to collect all tokens including EOF
 fn collect_tokens(code: &str) -> Vec<Token> {
