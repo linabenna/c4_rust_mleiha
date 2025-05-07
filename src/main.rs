@@ -1,282 +1,415 @@
-use std::collections::HashMap;
+// Constants for tokens and opcodes- add more
 
+// #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+// #[repr(i32)]
+// enum Token {
+//     None, 
+//     Num(i32),
+//     Id(String),
+//     Char(char),
+//     Str(String),
+//     Else, Enum, If, Int, Return, Sizeof, While, Assign, Cond, Lor, Lan, Or,
+//     Xor, And, Eq, Ne, Lt, Le, Gt, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec,
+//     Brak, 
+//     // RBrak,
+//     LParen = b'(' as i32,
+//     RParen = b')' as i32, 
+//     // LBrace, 
+//     // RBrace, 
+//     Comma = b',' as i32, 
+//     Colon = b':' as i32, 
+//     Semicolon = b';' as i32, 
+//     Not = b'!' as i32,
+//     BitNot = b'~' as i32,
+// }
+use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
-    Num(i64),
+    None, 
+    Num(i32),
     Id(String),
     Char(char),
     Str(String),
-    Else, Enum, If, Int, Return, Sizeof, While, Assign, Cond, Lor, Lan, Or,
-    Xor, And, Eq, Ne, Lt, Le, Gt, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec,
-    Brak, LParen, RParen, LBrace, RBrace, Comma, Colon, Semicolon, RBrak,
+    Else, Enum, If, Int, Return, Sizeof, While,
+    Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Lt, Shl, Add, Mul, Inc,
+    Ne, Le, Gt, Ge, Shr, Sub, Div, Mod, Dec,
+    Brak,
+    LParen, RParen, Comma, Colon, Semicolon, Not, BitNot,
 }
 
-// FROM C NEXT() TO RUST LEXER CLASS LOGIC EXPLAINED 
-// in the original c4 compiler the next function used a manual character 
-// pointer to iterate over the source code and classify tokens...
-
-// since pointers are considered unsafe in rust, other data structures like 
-// string slices (&str), indexes and options can track the source code.
-
-struct Lexer<'a> {
-    source: &'a str, // the full input source code to tokenize
-    position: usize, // current index in the source string
-    line: usize, // current line number- for debugging like c4
-    current_char: Option<char>, // currently read character 
-    keywords: HashMap<&'a str, Token>, // hashmap that maps strings like "if" and "return" to token types
+impl Token {
+    fn precedence(&self) -> Option<i32> {
+        use Token::*;
+        Some(match self {
+            Assign => 1,
+            Cond   => 2,
+            Lor    => 3,
+            Lan    => 4,
+            Or     => 5,
+            Xor    => 6,
+            And    => 7,
+            Eq     => 8,
+            Lt     => 9,
+            Shl    => 10,
+            Add    => 11,
+            Mul    => 12,
+            Inc    => 13,
+            _ => return Some(0),
+        })
+    }
 }
 
-// SInce structs in Rust can act like classes, we can define the 
-// following constructors and methods to build this lexer
+#[derive(Debug, Hash, Clone, PartialEq)]
+enum Class {
+    Sys,  // System function
+    Fun,  // User-defined function
+    Num,  // Immediate number
+    Loc,  // Local variable
+    Glo,  // Global variable
+}
 
-// new(): constructor to initialize the lexer - setting position, line, first char, populate keywords
+#[derive(Debug, Hash, Clone)]
+struct Symbol {
+    class: Class,   // Class of symbol (Sys, Fun, Num, Loc, Glo)
+    val: i32,       // Address or value
+    typ: i32,       // Type (e.g., INT, CHAR, PTR, etc.)
+}
 
-impl<'a> Lexer<'a> {
-    fn new(source: &'a str) -> Self { // constructor that initializes a new lexer instance
+const Num: i32 = 128;
+const Id: i32 = 129;
 
-        // default constructor --= default values
-        let mut lexer = Lexer {
-            source, // full source code
-            position: 0, // start reading from pos 0 = the beginning
-            line: 1, // error tracking from line 1 = the first line
-            current_char: None,
-            keywords: HashMap::new(), // empty keyword map for now
-        };
+// these are opcode constants the vm can execute
+const LEA: i32 = 0; // load effective address
+const IMM: i32 = 1; // load immediate value
+const JMP: i32 = 2; // unconditional jump
+const JSR: i32 = 3; // jump to subroutine (function call)
+const BZ: i32 = 4; // branch if zero
+const BNZ: i32 = 5; // branch if not zero
+const ENT: i32 = 6; // enter function (setup stack frame)
+const ADJ: i32 = 7; // adjust stack
+const LEV: i32 = 8; // leave function
+const LI: i32 = 9; // load integer from memory
+const LC: i32 = 10; // load character from memory
+const SI: i32 = 11; // store integer to memory
+const SC: i32 = 12; // store character to memory
+const PSH: i32 = 13; // push value onto stack
 
-        // we need to populate the keyword map with reserved words
-        Token::Else;
-        lexer.keywords.insert("enum", Token::Enum);
-        lexer.keywords.insert("if", Token::If);
-        lexer.keywords.insert("int", Token::Int);
-        lexer.keywords.insert("return", Token::Return);
-        lexer.keywords.insert("sizeof", Token::Sizeof);
-        lexer.keywords.insert("while", Token::While);
+// the rest below are arithmetic and logical operations
+const OR: i32 = 14;
+const XOR: i32 = 15;
+const AND: i32 = 16;
+const EQ: i32 = 17;
+const NE: i32 = 18;
+const LT: i32 = 19;
+const GT: i32 = 20;
+const LE: i32 = 21;
+const GE: i32 = 22;
+const SHL: i32 = 23;
+const SHR: i32 = 24;
+const ADD: i32 = 25;
+const SUB: i32 = 26;
+const MUL: i32 = 27;
+const DIV: i32 = 28;
+const MOD: i32 = 29;
 
-        // advance to the first character of the source code
-        // this mimics how c4 manually reads the first char into a variable
-        lexer.advance();
-        lexer
-    }
+// below are system calls
+const OPEN: i32 = 30;
+const READ: i32 = 31;
+const CLOS: i32 = 32;
+const PRTF: i32 = 33;
+const MALC: i32 = 34;
+const FREE: i32 = 35;
+const MSET: i32 = 36;
+const MCMP: i32 = 37;
+const EXIT: i32 = 38;
 
-    // here this function moves to the next character in the source code
-    fn advance(&mut self) {
-        // if we're not at the end of the code, get the next byte and convert it to a char
-        self.current_char = if self.position < self.source.len() {
-            Some(self.source.as_bytes()[self.position] as char)
-        } else { // we reached the end of the source code
-            None
-        };
-        self.position += 1; // move the reading position to the next 
-    }
+// data types
+const CHAR: i32 = 0;
+const INT: i32 = 1;
+const PTR: i32 = 2;
 
-    // this function allows us to look at the next character in the source code 
-    // without actually advancing the current reading position (used for lookahead logic)
-    fn peek(&self) -> Option<char> { // sampe implementation as advance() method 
-        if self.position < self.source.len() {
-            Some(self.source.as_bytes()[self.position] as char)
-        } else {
-            None
+#[derive(Debug)]
+struct Parser {
+    e: Vec<i32>, // Emitted code
+    tk: Token,     // Current token
+    ival: i32,   // Current token value
+    ty: i32,     // Current expression type
+    loc: i32,    // Local variable offset
+    line: i32,   // Current line number
+    data: Vec<u8>, // <--- memory area to simulate global string storage
+    pos: i32, 
+    symbols: HashMap<String, Symbol>,
+}
+
+impl Parser {
+    fn new() -> Self {
+        Self {
+            e: Vec::new(),
+            tk: Token::None, // defining anything for now
+            ival: 0,
+            ty: 0,
+            loc: 0,
+            line: 1,
+            data: Vec::new(),
+            pos: 0,
+            symbols: HashMap::new(),
         }
     }
 
-    // this function gets the next token from the source code
-    fn next_token(&mut self) -> Option<Token> {
-        while let Some(c) = self.current_char { // loop while there is a current character to process
-            match c {
-                ' ' | '\t' | '\r' => self.advance(), // skip whitespace characters
-                '\n' => { // a newline is found?
-                    self.line += 1; // then increment line number 
-                    self.advance();
-                }
+    fn next(&mut self) {
+        // here, given the tokens generated from the parser, 
+        // implement a function that advances through each token
+        // Logic to get the next token
+        // if self.pos < self.tokens.len() {
+        //     self.tk = self.tokens[self.pos].clone();
+        //     self.pos += 1;
+        // } else {
+        //     self.tk = Token::None;
+        // }
+    }
 
-                // handle single-line comments and hash comments
-                '/' => {
-                    if self.peek() == Some('/') {
-                        while self.current_char != Some('\n') && self.current_char.is_some() {
-                            self.advance();
+    fn expr(&mut self, lev: i32) {
+        let token = self.tk.clone();
+
+        match token {
+            Token::None => {
+                eprintln!("{}: unexpected eof in expression", self.line);
+                std::process::exit(-1);
+            }
+            Token::Num(val) => {
+                self.e.push(IMM);
+                self.e.push(val);
+                self.next();
+                self.ty = INT;
+            }
+            Token::Str(s) => {
+                self.e.push(IMM);
+                let addr = self.store_string(&s); // Now no conflict with borrowing `self`
+                self.e.push(addr);
+                self.next();
+                self.ty = INT; // Or PTR, depending on your needs
+            }
+
+            Token::Sizeof => {
+                self.next();
+                if self.tk != Token::LParen {
+                    eprintln!("{}: open paren expected in sizeof", self.line);
+                    std::process::exit(-1);
+                }
+                self.next();
+            
+                self.ty = INT;
+                if self.tk == Token::Int {
+                    self.next();
+                } else if matches!(self.tk, Token::Char(_)) {
+                    self.next();
+                    self.ty = CHAR;
+                } else {
+                    eprintln!("{}: type name expected in sizeof", self.line);
+                    std::process::exit(-1);
+                }
+                while self.tk == Token::Mul {
+                    self.next();
+                    self.ty += PTR;
+                }
+                if self.tk != Token::RParen {
+                    eprintln!("{}: close paren expected in sizeof", self.line);
+                    std::process::exit(-1);
+                }
+                self.next();
+            
+                self.e.push(IMM);
+                self.e.push(if self.ty == CHAR { 1 } else { 4 }); // assuming sizeof(char) = 1, sizeof(int) = 4
+                self.ty = INT;
+            }         
+
+            Token::Id(ref name) => {
+                // Lookup the symbol table entry by identifier name
+                // let d = self.symbols.get(name).cloned().unwrap_or_else(|| {
+                //     eprintln!("{}: undefined identifier '{}'", self.line, name);
+                //     std::process::exit(-1);
+                // });
+                // self.next();
+
+                if let Some(d) = self.symbols.get(name.as_str()).cloned() {
+                    self.next(); // consume identifier
+
+                    if self.tk == Token::LParen {
+                        self.next();
+                        let mut t = 0;
+                        while self.tk != Token::RParen {
+                            self.expr(Token::Assign.precedence().unwrap());
+                            self.e.push(PSH);
+                            t += 1;
+                            if self.tk == Token::Comma {
+                                self.next();
+                            }
                         }
+                        self.next();
+                        match d.class {
+                            Class::Sys => self.e.push(d.val),
+                            Class::Fun => {
+                                self.e.push(JSR);
+                                self.e.push(d.val);
+                            }
+                            _ => {
+                                eprintln!("{}: bad function call", self.line);
+                                std::process::exit(-1);
+                            }
+                        }
+                        if t > 0 {
+                            self.e.push(ADJ);
+                            self.e.push(t);
+                        }
+                        self.ty = d.typ;
+                    } else if d.class == Class::Num {
+                        self.e.push(IMM);
+                        self.e.push(d.val);
+                        self.ty = INT;
                     } else {
-                        self.advance();
-                        return Some(Token::Div);
-                    }
-                }
-                '#' => {
-                    while self.current_char != Some('\n') && self.current_char.is_some() {
-                        self.advance();
-                    }
-                }
-
-                // handle string literal
-                '"' => {
-                    self.advance();
-                    let mut string = String::new();
-                    while let Some(ch) = self.current_char {
-                        if ch == '"' {
-                            break;
+                        match d.class {
+                            Class::Loc => {
+                                self.e.push(LEA);
+                                self.e.push(self.loc - d.val);
+                            }
+                            Class::Glo => {
+                                self.e.push(IMM);
+                                self.e.push(d.val);
+                            }
+                            _ => {
+                                eprintln!("{}: undefined variable '{}'", self.line, name);
+                                std::process::exit(-1);
+                            }
                         }
-                        string.push(ch);
-                        self.advance();
+                        self.ty = d.typ;
+                        self.e.push(if self.ty == CHAR { LC } else { LI });
                     }
-                    self.advance(); // skip closing "
-                    return Some(Token::Str(string));
+                } else {
+                    println!("{}: undefined variable {}", self.line, name);
+                    std::process::exit(-1);
                 }
-
-                // handle character literal
-                '\'' => {
-                    self.advance();
-                    let ch = self.current_char?;
-                    self.advance();
-                    self.advance(); // skip closing '
-                    return Some(Token::Char(ch));
+                
+            }            
+            
+            Token::Mul => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                if (self.ty == INT){
+                    self.ty = self.ty - PTR;
+                } else {
+                    eprintln!("{}: close paren expected in sizeof", self.line);
+                    std::process::exit(-1);
                 }
+                self.e.push(if self.ty == CHAR { LC } else { LI })
+            }
 
-                // handle operators
-                '=' => {
-                    self.advance();
-                    if self.current_char == Some('=') {
-                        self.advance();
-                        return Some(Token::Eq);
+            Token::And => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                
+                if let Some(&last) = self.e.last() {
+                    if last == LC || last == LI {
+                        self.e.pop();
+                    } else {
+                        eprintln!("{}: bad address-of", self.line);
+                        std::process::exit(-1);
                     }
-                    return Some(Token::Assign);
+                } else {
+                    eprintln!("{}: close paren expected in sizeof", self.line);
+                    std::process::exit(-1);
                 }
+                self.ty = self.ty + PTR;
+            }
 
-                '!' => {
-                    self.advance();
-                    if self.current_char == Some('=') {
-                        self.advance();
-                        return Some(Token::Ne);
+            Token::Not => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap()); // Inc is the precedence level
+                self.e.push(PSH);
+                self.e.push(IMM);
+                self.e.push(0);
+                self.e.push(EQ);
+                self.ty = INT;
+            }
+            Token::BitNot => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                self.e.push(PSH);
+                self.e.push(IMM);
+                self.e.push(-1);
+                self.e.push(XOR);
+                self.ty = INT;
+            }
+            Token::Add => {
+                self.next();
+                self.expr(Token::Inc.precedence().unwrap());
+                self.ty = INT;
+            }
+            
+            Token::Sub => {
+                self.next();
+                self.e.push(IMM);
+                match self.tk.clone() {
+                    Token::Num(val) => {
+                        self.e.push(-val);
+                        self.next();
+                    }
+                    _ => {
+                        self.e.push(-1);
+                        self.e.push(PSH);
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.e.push(MUL);
                     }
                 }
+                self.ty = INT;
+            }
 
-                '<' => {
-                    self.advance();
-                    if self.current_char == Some('=') {
-                        self.advance();
-                        return Some(Token::Le);
-                    }
-                    return Some(Token::Lt);
-                }
 
-                '>' => {
-                    self.advance();
-                    if self.current_char == Some('=') {
-                        self.advance();
-                        return Some(Token::Ge);
-                    }
-                    return Some(Token::Gt);
-                }
 
-                '+' => {
-                    self.advance();
-                    if self.current_char == Some('+') {
-                        self.advance();
-                        return Some(Token::Inc);
-                    }
-                    return Some(Token::Add);
-                }
-
-                '-' => {
-                    self.advance();
-                    if self.current_char == Some('-') {
-                        self.advance();
-                        return Some(Token::Dec);
-                    }
-                    return Some(Token::Sub);
-                }
-
-                '*' => {
-                    self.advance();
-                    return Some(Token::Mul);
-                }
-
-                '%' => {
-                    self.advance();
-                    return Some(Token::Mod);
-                }
-
-                '0'..='9' => return Some(self.lex_number()), // if a digit is found, parse a number token
-
-                // if a letter or underscore is found, parse an identifier or keyword
-                'a'..='z' | 'A'..='Z' | '_' => return Some(self.lex_identifier()), 
-
-                '"' => return Some(self.lex_string()), // detect string literals
-
-                // return simple character tokens like parentheses and semicolons directly
-                '(' | ')' | '{' | '}' | ';' => {
-                    let token = Token::Char(c);
-                    self.advance();
-                    return Some(token);
-                }
-                _ => { // if an unknown character is found, just skip it
-                    self.advance(); // skip
-                }
+            _ => {
+                eprintln!("{}: bad expression", self.line);
+                std::process::exit(-1);
             }
         }
-        None 
-    }
-
-    // parses a sequence of digits into a number token
-    fn lex_number(&mut self) -> Token {
-        let mut value = 0;
-        while let Some(c) = self.current_char {
-            // if the character is a digit, convert it to a number and build the full value
-            if c.is_digit(10) {
-                value = value * 10 + c.to_digit(10).unwrap() as i64;
-                self.advance();
-            } else {
-                break; // stop reading if it's not a digit
-            }
-        }
-        Token::Num(value) // return the number as a token
-    }
-
-    // this method parses an identifier or a reserved keyword from c
-    fn lex_identifier(&mut self) -> Token {
-        let start = self.position - 1; // this si the satrting pos of the identifier
-
-        while let Some(c) = self.current_char { // keep reading letters, digits, or underscores
-            if c.is_alphanumeric() || c == '_' {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        let identifier = &self.source[start..self.position - 1]; // get identifier from source code
-
-        if let Some(keyword) = self.keywords.get(identifier) { // check if the keyword is known 
-            keyword.clone() // if known, return the keyword token
-        } else {
-            // otherwise, return it as a regular identifier
-            Token::Id(identifier.to_string())
-        }
-    }
-
-    // handlling when printf is printing full string
-    fn lex_string(&mut self) -> Token {
-        let start = self.position; // mark the start of the string
-        self.advance(); // skip the opening quote
-        // Read characters until we find the closing quote or end of input
-        while let Some(c) = self.current_char {
-            if c == '"' {
-                break; // found the closing quote
-            }
-            self.advance();
-        }
-        let string = &self.source[start..self.position - 1]; // extract the string content
-        self.advance(); // skip the closing quote
-        Token::Str(string.to_string()) // return the string token
-    }
     
+        // precedence climbing would go here
+    }
+
+    fn store_string(&mut self, s: &str) -> i32 {
+        // Align to 4 bytes (simulate C4's `sizeof(int) & -sizeof(int)`)
+        while self.data.len() % 4 != 0 {
+            self.data.push(0);
+        }
+
+        let address = self.data.len() as i32; // get the current offset (address)
+
+        // Store the string bytes
+        self.data.extend_from_slice(s.as_bytes());
+        self.data.push(0); // null-terminator
+
+        // Optional: align after string for next storage
+        while self.data.len() % 4 != 0 {
+            self.data.push(0);
+        }
+
+        address
+    }
 }
+
 
 fn main() {
-    // let source_code = "int main() {  5 + 2; }";
-    let source_code = r#"int main() {  printf("hello, world\n") ; }"#;
-    // let source_code = "int main() {  return 0; }";
-    let mut lexer = Lexer::new(source_code);
+    let mut state = Parser::new();
+    
+    // Test with a number
+    state.tk = Token::Num(42);
+    state.expr(0);
+    println!("Emitted code (number): {:?}", state.e);
 
-    while let Some(token) = lexer.next_token() {
-        println!("{:?}", token);
-    }
+    // Reset state
+    state.e.clear();
+
+    // Test with a string
+    state.tk = Token::Str("hello".to_string());
+    state.expr(0);
+    println!("Emitted code (string): {:?}", state.e);
+    println!("Data section (string): {:?}", state.data);
 }
