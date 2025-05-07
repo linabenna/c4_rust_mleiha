@@ -22,7 +22,7 @@
 //     Not = b'!' as i32,
 //     BitNot = b'~' as i32,
 // }
-
+use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Token {
     None, 
@@ -30,7 +30,7 @@ enum Token {
     Id(String),
     Char(char),
     Str(String),
-    Else, Enum, If, Int, Return, Sizeof, While, 
+    Else, Enum, If, Int, Return, Sizeof, While,
     Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Lt, Shl, Add, Mul, Inc,
     Ne, Le, Gt, Ge, Shr, Sub, Div, Mod, Dec,
     Brak,
@@ -59,6 +59,21 @@ impl Token {
     }
 }
 
+#[derive(Debug, Hash, Clone, PartialEq)]
+enum Class {
+    Sys,  // System function
+    Fun,  // User-defined function
+    Num,  // Immediate number
+    Loc,  // Local variable
+    Glo,  // Global variable
+}
+
+#[derive(Debug, Hash, Clone)]
+struct Symbol {
+    class: Class,   // Class of symbol (Sys, Fun, Num, Loc, Glo)
+    val: i32,       // Address or value
+    typ: i32,       // Type (e.g., INT, CHAR, PTR, etc.)
+}
 
 const Num: i32 = 128;
 const Id: i32 = 129;
@@ -123,6 +138,7 @@ struct Parser {
     line: i32,   // Current line number
     data: Vec<u8>, // <--- memory area to simulate global string storage
     pos: i32, 
+    symbols: HashMap<String, Symbol>,
 }
 
 impl Parser {
@@ -136,6 +152,7 @@ impl Parser {
             line: 1,
             data: Vec::new(),
             pos: 0,
+            symbols: HashMap::new(),
         }
     }
 
@@ -206,11 +223,74 @@ impl Parser {
                 self.ty = INT;
             }         
 
-            Token::Id(name) => {
-                // Logic for identifier (e.g. variable or function)
-                self.next();
-            }
+            Token::Id(ref name) => {
+                // Lookup the symbol table entry by identifier name
+                // let d = self.symbols.get(name).cloned().unwrap_or_else(|| {
+                //     eprintln!("{}: undefined identifier '{}'", self.line, name);
+                //     std::process::exit(-1);
+                // });
+                // self.next();
 
+                if let Some(d) = self.symbols.get(name.as_str()).cloned() {
+                    self.next(); // consume identifier
+
+                    if self.tk == Token::LParen {
+                        self.next();
+                        let mut t = 0;
+                        while self.tk != Token::RParen {
+                            self.expr(Token::Assign.precedence().unwrap());
+                            self.e.push(PSH);
+                            t += 1;
+                            if self.tk == Token::Comma {
+                                self.next();
+                            }
+                        }
+                        self.next();
+                        match d.class {
+                            Class::Sys => self.e.push(d.val),
+                            Class::Fun => {
+                                self.e.push(JSR);
+                                self.e.push(d.val);
+                            }
+                            _ => {
+                                eprintln!("{}: bad function call", self.line);
+                                std::process::exit(-1);
+                            }
+                        }
+                        if t > 0 {
+                            self.e.push(ADJ);
+                            self.e.push(t);
+                        }
+                        self.ty = d.typ;
+                    } else if d.class == Class::Num {
+                        self.e.push(IMM);
+                        self.e.push(d.val);
+                        self.ty = INT;
+                    } else {
+                        match d.class {
+                            Class::Loc => {
+                                self.e.push(LEA);
+                                self.e.push(self.loc - d.val);
+                            }
+                            Class::Glo => {
+                                self.e.push(IMM);
+                                self.e.push(d.val);
+                            }
+                            _ => {
+                                eprintln!("{}: undefined variable '{}'", self.line, name);
+                                std::process::exit(-1);
+                            }
+                        }
+                        self.ty = d.typ;
+                        self.e.push(if self.ty == CHAR { LC } else { LI });
+                    }
+                } else {
+                    println!("{}: undefined variable {}", self.line, name);
+                    std::process::exit(-1);
+                }
+                
+            }            
+            
             Token::Mul => {
                 self.next();
                 self.expr(Token::Inc.precedence().unwrap());
@@ -241,6 +321,68 @@ impl Parser {
                 self.ty = self.ty + PTR;
             }
 
+            Token::LParen => {
+                self.next(); // consume '('
+                match self.tk {
+                    Token::Int => {
+                        // Handle cast for 'Int'
+                        let mut t = INT;  // Initialize the type as INT
+                        self.next(); // consume 'Int'
+            
+                        // Check for pointer dereferencing (*)
+                        while let Token::Mul = self.tk {
+                            self.next(); // consume '*'
+                            t = t + PTR; // Adjust type for pointers
+                        }
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: bad cast", self.line); // Handle bad cast
+                        }
+            
+                        // Handle the casted expression
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.ty = t; // Set the type for the expression
+                    }
+                    Token::Char(_) => {
+                        // Handle cast for 'Char'
+                        let mut t = CHAR;  // Initialize the type as CHAR
+                        self.next(); // consume 'Char'
+            
+                        // Check for pointer dereferencing (*)
+                        while let Token::Mul = self.tk {
+                            self.next(); // consume '*'
+                            t = t + PTR; // Adjust type for pointers
+                        }
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: bad cast", self.line); // Handle bad cast
+                        }
+            
+                        // Handle the casted expression
+                        self.expr(Token::Inc.precedence().unwrap());
+                        self.ty = t; // Set the type for the expression
+                    }
+                    _ => {
+                        // Regular parenthesis group
+                        self.expr(Token::Assign.precedence().unwrap());
+            
+                        // Ensure we have a closing parenthesis ')'
+                        if let Token::RParen = self.tk {
+                            self.next(); // consume ')'
+                        } else {
+                            panic!("{}: close paren expected", self.line); // Handle missing closing parenthesis
+                        }
+                    }
+                }
+            }            
+
+            
             Token::Not => {
                 self.next();
                 self.expr(Token::Inc.precedence().unwrap()); // Inc is the precedence level
@@ -283,7 +425,42 @@ impl Parser {
                 self.ty = INT;
             }
 
-
+            Token::Inc | Token::Dec => {
+                let t = self.tk.clone(); // Clone the current token (Inc or Dec)
+                self.next(); // Consume the token (either Inc or Dec)
+                
+                // Evaluate the expression for the operand
+                self.expr(Token::Inc.precedence().unwrap());
+            
+                // Handle the left operand type (either LC or LI)
+                match self.e.last() {
+                    Some(&LC) => {
+                        self.e.push(PSH); // Push the operand to the stack
+                        self.e.push(LC); // Load the left value
+                    }
+                    Some(&LI) => {
+                        self.e.push(PSH); // Push the operand to the stack
+                        self.e.push(LI); // Load the left integer
+                    }
+                    _ => {
+                        panic!("{}: bad lvalue in pre-increment", self.line); // Handle bad lvalue
+                    }
+                }
+            
+                // Push the size of the type onto the stack
+                self.e.push(PSH); // Push
+                let size = if self.ty > PTR {
+                    IMM // Immediate value
+                } else {
+                    IMM // Immediate value for char
+                };
+                self.e.push(size);
+                self.e.push(if t == Token::Inc { ADD } else { SUB }); // ADD for Inc, SUB for Dec
+            
+                // Store the result (either as a character or an integer)
+                self.e.push(if self.ty == CHAR { SC } else { SI });
+            }
+            
             _ => {
                 eprintln!("{}: bad expression", self.line);
                 std::process::exit(-1);
