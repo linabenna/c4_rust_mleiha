@@ -60,7 +60,7 @@ void next()
 {
   char *pp;
 
-  while (tk = *p) { // loop through each character in the source code (tk=*p tests whther p is pointing to non-null)
+  while (tk = *p) { // loop through each character in the source code (tk=*ptests whther p is pointing to non-null)
     ++p; // move to next slot in memory 
     if (tk == '\n') {  // if the character is a newline
       if (src) { // if debugging then print the source code
