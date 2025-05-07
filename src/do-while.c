@@ -2,7 +2,7 @@
 
 int main() {
     do {
-        printf("100");
+        printf("Testing inside Do \n");
     } while (0);
     return 0;
 }
